@@ -1,11 +1,19 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { all, get } from '../db/database';
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 export interface SegmentAIResult {
   filterQuery: string;
-  aiReasoning: { audienceInsight: string; churnRisk: string; recommendedChannel: string; bestSendTime: string; estimatedRevenueImpact: string; whyThisAudience: string; };
+  aiReasoning: {
+    audienceInsight: string;
+    churnRisk: string;
+    recommendedChannel: string;
+    bestSendTime: string;
+    estimatedRevenueImpact: string;
+    whyThisAudience: string;
+  };
   segmentName: string;
   description: string;
 }
@@ -21,44 +29,42 @@ TODAY: ${new Date().toISOString().split('T')[0]}
 
 MARKETER: "${naturalLanguageQuery}"
 
-Return ONLY valid JSON (no markdown):
+Return ONLY valid JSON, no markdown, no backticks, nothing else:
 {
-  "filterQuery": "SQL WHERE clause for customers table",
+  "filterQuery": "SQL WHERE clause for customers table only",
   "segmentName": "Punchy 3-5 word name",
-  "description": "1 sentence",
+  "description": "1 sentence description",
   "aiReasoning": {
-    "audienceInsight": "Key behavioral insight",
-    "churnRisk": "High/Medium/Low — reason",
-    "recommendedChannel": "WhatsApp/SMS/Email/RCS — reason",
+    "audienceInsight": "Key behavioral insight about this group",
+    "churnRisk": "High/Medium/Low — one line reason",
+    "recommendedChannel": "WhatsApp/SMS/Email/RCS — one line reason",
     "bestSendTime": "e.g. Tue-Thu 7-9PM IST",
     "estimatedRevenueImpact": "GMV estimate if 15-25% convert",
-    "whyThisAudience": "Strategic angle — why NOW"
+    "whyThisAudience": "Strategic angle — why target them NOW"
   }
 }
 
-SQL RULES: Only WHERE clause. Use date('now','-N days') for relative dates. No semicolons. No DROP/DELETE/UPDATE.`;
+SQL RULES: Only a WHERE clause. Use date('now','-N days') for relative dates. No semicolons. No DROP/DELETE/UPDATE/INSERT.`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6', max_tokens: 1000,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const raw = response.content[0].type === 'text' ? response.content[0].text : '';
   try {
-    const clean = raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text();
+    const clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     return JSON.parse(clean);
-  } catch {
+  } catch (err) {
+    console.error('Gemini segment build error:', err);
+    // Sensible fallback so the app never crashes
     return {
       filterQuery: "total_spent > 10000",
       segmentName: "High Value Shoppers",
       description: "Customers with strong purchase history",
       aiReasoning: {
-        audienceInsight: "These customers have demonstrated strong brand affinity.",
-        churnRisk: "Medium — needs re-engagement",
-        recommendedChannel: "WhatsApp — highest open rates for premium fashion",
+        audienceInsight: "These customers have demonstrated strong brand affinity through repeat purchases.",
+        churnRisk: "Medium — needs re-engagement to stay active",
+        recommendedChannel: "WhatsApp — highest open rates for premium fashion in India",
         bestSendTime: "Tue-Thu, 7-9PM IST",
-        estimatedRevenueImpact: "₹40,000–60,000 if 20% convert",
-        whyThisAudience: "High-value customers cost 5x less to re-engage than acquiring new."
+        estimatedRevenueImpact: "₹40,000–60,000 if 20% convert on avg order of ₹4,000",
+        whyThisAudience: "High-value customers cost 5x less to re-engage than acquiring new ones."
       }
     };
   }
@@ -69,7 +75,7 @@ const FORBIDDEN = /\b(DROP|DELETE|UPDATE|INSERT|ALTER|TRUNCATE|EXEC|UNION)\b/i;
 export function countCustomersForFilter(filterQuery: string): number {
   if (FORBIDDEN.test(filterQuery)) return 0;
   try {
-    const row = get<{count:number}>(`SELECT COUNT(*) as count FROM customers WHERE ${filterQuery}`);
+    const row = get<{ count: number }>(`SELECT COUNT(*) as count FROM customers WHERE ${filterQuery}`);
     return row?.count ?? 0;
   } catch { return 0; }
 }
@@ -77,7 +83,7 @@ export function countCustomersForFilter(filterQuery: string): number {
 export function getCustomersForFilter(filterQuery: string): string[] {
   if (FORBIDDEN.test(filterQuery)) return [];
   try {
-    const rows = all<{id:string}>(`SELECT id FROM customers WHERE ${filterQuery} LIMIT 500`);
+    const rows = all<{ id: string }>(`SELECT id FROM customers WHERE ${filterQuery} LIMIT 500`);
     return rows.map(r => r.id);
   } catch { return []; }
 }
@@ -86,6 +92,7 @@ export async function generatePersonalizedMessages(
   customers: Array<{ id: string; name: string; tier: string; preferred_category: string; city: string; total_spent: number }>,
   ctx: { segmentDescription: string; channel: string; goal: string }
 ): Promise<Array<{ customerId: string; message: string }>> {
+
   const list = customers.map(c =>
     `ID:${c.id} | ${c.name} | ${c.tier} | Loves:${c.preferred_category} | ${c.city} | ₹${c.total_spent.toLocaleString('en-IN')} LTV`
   ).join('\n');
@@ -101,25 +108,22 @@ ${list}
 Rules:
 - WhatsApp/SMS: max 160 chars, include first name, subtle CTA
 - Email: subject line only (max 60 chars)
-- Tommy Hilfiger tone: premium, aspirational, warm
-- Personalize: mention their tier or preferred category naturally
+- Tommy Hilfiger tone: premium, aspirational, warm — not pushy
+- Personalize: mention their preferred category or tier naturally
 
-Return ONLY JSON array (no markdown):
-[{"customerId":"<exact ID from above>","message":"..."},...]`;
+Return ONLY a JSON array, no markdown, no backticks:
+[{"customerId":"<exact ID>","message":"..."},...]`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6', max_tokens: 1000,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const raw = response.content[0].type === 'text' ? response.content[0].text : '[]';
   try {
-    const clean = raw.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text();
+    const clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     return JSON.parse(clean);
   } catch {
+    // Fallback: template messages
     return customers.map(c => ({
       customerId: c.id,
-      message: `Hey ${c.name.split(' ')[0]}! Your exclusive Tommy Hilfiger ${c.preferred_category} drop is here. Shop now. 🏆`
+      message: `Hey ${c.name.split(' ')[0]}! Your exclusive Tommy Hilfiger ${c.preferred_category} drop is here. Shop now 🏆`
     }));
   }
 }

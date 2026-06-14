@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    background-color: #FAFAF8;
+    color: #1A1A1A;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #F5F0EB; }
+  ::-webkit-scrollbar-thumb { background: #D0C8C0; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #FF5C1A; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply flex items-center gap-2 bg-brand-orange hover:bg-brand-orange-light text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 shadow-orange-sm hover:shadow-orange disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply flex items-center gap-2 text-brand-gray hover:text-brand-black border border-brand-border hover:border-brand-border-dark px-4 py-2 rounded-lg text-sm transition-all duration-200;
+  }
+  .card {
+    @apply bg-brand-white border border-brand-border rounded-xl shadow-card;
+  }
+  .input {
+    @apply w-full bg-brand-bg border border-brand-border rounded-lg px-3 py-2.5 text-brand-black text-sm focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange placeholder:text-brand-gray-light transition-all duration-150;
+  }
+  .label {
+    @apply text-brand-gray text-xs font-medium uppercase tracking-wider block mb-2;
+  }
+  .tag {
+    @apply inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium;
+  }
+}

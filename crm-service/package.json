@@ -1,0 +1,32 @@
+{
+  "name": "cohortai-crm",
+  "version": "1.0.0",
+  "description": "cohortai CRM Service - AI-native mini CRM for Tommy Hilfiger India",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "seed": "ts-node src/db/seed.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.20.9",
+    "@types/sqlite3": "^3.1.11",
+    "axios": "1.17.0",
+    "cors": "2.8.6",
+    "dotenv": "16.6.1",
+    "express": "4.22.2",
+    "sql.js": "^1.14.1",
+    "uuid": "10.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
+    "@types/node": "^20.19.43",
+    "@types/sql.js": "^1.4.11",
+    "@types/uuid": "^9.0.8",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}

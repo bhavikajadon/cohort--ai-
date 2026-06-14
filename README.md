@@ -1,200 +1,217 @@
-# cohortai — AI-Native Mini CRM
-### Built for the Xeno Engineering Take-Home | Tommy Hilfiger India
+<div align="center">
 
-> **An AI-native customer engagement platform that helps a fashion brand decide *who to talk to*, *what to say*, and *tracks every message* as it moves through the real world — in real time.**
+# Cohort AI
+### AI-Native Mini CRM — Built for the Xeno FDE Challenge
 
----
+**Tommy Hilfiger India · Fashion & Apparel**
 
-## 10-Second Summary
-
-cohortai is a two-service, event-driven mini CRM built specifically for Tommy Hilfiger India's marketing team. A marketer describes their target audience in plain English → AI translates it into a precise shopper segment with strategic reasoning → personalizes each message per customer → dispatches via a channel-simulating service → and tracks every delivery, open, click, and purchase in a live waterfall dashboard.
-
-**What makes it different from a CRUD CRM with an AI chatbox bolted on:** the AI is embedded at every decision point — not just message drafting, but audience intelligence, churn risk scoring, channel recommendation, and revenue impact estimation. The channel service accurately models the async, callback-driven lifecycle of real messaging infrastructure.
+[Live Demo](https://cohort-ai-seven.vercel.app/) · [API Health](https://cohort-ai-crm.onrender.com) · [Walkthrough Video](#)
 
 ---
 
-## Live Demo
+*A marketer types what they want in plain English. AI finds the audience, writes every message, sends it, and tracks every delivery — live.*
+
+</div>
+
+---
+
+## What Is This
+
+Cohort AI is a two-service, event-driven CRM built for a D2C fashion brand. It solves the gap between "we have customer data" and "we ran a smart campaign that moved revenue."
+
+Most CRMs make you build segments by clicking filters, write messages manually, and check stats in a report 24 hours later. Cohort AI inverts all three:
+
+- **Segments** — describe your audience in plain English, AI builds the SQL filter and explains *why* this audience matters right now
+- **Messages** — AI writes a personalized message for every individual shopper, not a template
+- **Tracking** — watch every message move through `Sent → Delivered → Opened → Clicked → Converted` in a live waterfall as it happens
+
+The "AI" here is not a chatbot bolted on. It is embedded at every decision point in the product.
+
+---
+
+## Live URLs
 
 | Service | URL |
 |---------|-----|
-| 🖥️ Frontend | [cohortai.vercel.app](https://your-frontend-url) |
-| 🔧 CRM API | [crm.railway.app/health](https://your-crm-url/health) |
-| 📡 Channel Service | [channel.railway.app/health](https://your-channel-url/health) |
+| Frontend | https://cohort-ai-seven.vercel.app/ |
+| CRM API | https://cohort-ai-crm.onrender.com|
+| Channel Service | https://cohort-ai-channel.onrender.com |
 
-📹 **Walkthrough Video:** [Loom link here]
+📹 **Walkthrough Video:** [Loom link — add after recording]
 
 ---
 
 ## Quickstart (Local)
 
-**Prerequisites:** Node.js 18+, npm, an Anthropic API key
+**Prerequisites:** Node.js 18+, npm, a free Gemini API key from [aistudio.google.com](https://aistudio.google.com)
 
 ```bash
-# 1. Clone
-git clone https://github.com/yourusername/cohortai
-cd cohortai
+# Clone
+git clone https://github.com/bhavikajadon/cohort-ai.git
+cd cohort-ai
 
-# 2. Install all dependencies
-cd crm-service && npm install && cd ..
+# Install dependencies
+cd crm-service     && npm install && cd ..
 cd channel-service && npm install && cd ..
-cd frontend && npm install && cd ..
+cd frontend        && npm install && cd ..
 
-# 3. Configure environment
+# Configure CRM environment
 cp crm-service/.env.example crm-service/.env
-# Edit crm-service/.env → add your ANTHROPIC_API_KEY
-# CHANNEL_SERVICE_URL=http://localhost:3001
-# CRM_CALLBACK_URL=http://localhost:3000
+# Edit crm-service/.env — add your GEMINI_API_KEY
+# Set CHANNEL_SERVICE_URL=http://localhost:3001
+# Set CRM_CALLBACK_URL=http://localhost:3000
 
-# 4. Seed the database (Tommy Hilfiger India shoppers)
+# Seed the database
 cd crm-service && npm run seed && cd ..
 
-# 5. Start all three services (3 terminal windows)
-cd crm-service && npm run dev      # → http://localhost:3000
-cd channel-service && npm run dev  # → http://localhost:3001
-cd frontend && npm run dev         # → http://localhost:5173
+# Start all three services (three terminals)
+cd crm-service     && npm run dev   # → http://localhost:3000
+cd channel-service && npm run dev   # → http://localhost:3001
+cd frontend        && npm run dev   # → http://localhost:5173
 ```
 
-That's it. Open `http://localhost:5173` and you're live.
+Open `http://localhost:5173` — you're live.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         FRONTEND (React + TypeScript)            │
-│   Dashboard | Segment Builder | Campaign Manager | Live Tracker  │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │ REST API calls
+┌──────────────────────────────────────────────────────────┐
+│              FRONTEND  (React + TypeScript + Vite)        │
+│   Dashboard · Segment Builder · Campaigns · Live Tracker  │
+└─────────────────────┬────────────────────────────────────┘
+                      │ REST
                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    CRM SERVICE (Node.js + TypeScript)            │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │  /customers  │  │  /segments   │  │     /campaigns       │  │
-│  │  list, stats │  │  AI builder  │  │ create, send, track  │  │
-│  └──────────────┘  └──────┬───────┘  └──────────┬───────────┘  │
-│                            │                      │              │
-│                     ┌──────▼───────┐    ┌────────▼──────────┐  │
-│                     │  Claude API  │    │  /receipts        │  │
-│                     │  NL→SQL      │    │  callback ingress │  │
-│                     │  Reasoning   │    └────────┬──────────┘  │
-│                     │  Msg Compose │             │              │
-│                     └──────────────┘    ┌────────▼──────────┐  │
-│                                         │  SQLite (WAL)     │  │
-│                                         │  customers        │  │
-│                                         │  orders           │  │
-│                                         │  segments         │  │
-│                                         │  campaigns        │  │
-│                                         │  communications   │  │
-│                                         └───────────────────┘  │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ POST /api/send (per recipient)
+┌──────────────────────────────────────────────────────────┐
+│              CRM SERVICE  (Node.js + TypeScript)          │
+│                                                           │
+│  /customers   /segments        /campaigns   /receipts     │
+│  list, stats  AI builder       create,send  callback      │
+│               NL → SQL         track        ingress       │
+│               reasoning card                              │
+│                    │                 │                    │
+│             Gemini API          sql.js DB                 │
+│          (segment + messages)   (SQLite WASM)             │
+└────────────────────────────┬─────────────────────────────┘
+                             │ POST /api/send
                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  CHANNEL SERVICE (Node.js + TypeScript)          │
-│                                                                  │
-│  Receives send request → ACKs immediately → simulates async     │
-│  delivery lifecycle → fires callbacks back to CRM               │
-│                                                                  │
-│  Queued → Sent → [Delivered | Failed] → Opened → Clicked        │
-│                                               → Converted       │
-│                                                                  │
-│  Per-channel profiles: WhatsApp (94% delivery, 72% open)       │
-│  SMS (89%, 45%) · Email (96%, 28%) · RCS (78%, 55%)            │
-│  Retry logic: 3 attempts with exponential backoff               │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│           CHANNEL SERVICE  (Node.js + TypeScript)         │
+│                                                           │
+│  Receives send request → ACKs immediately                 │
+│  → simulates async delivery lifecycle                     │
+│  → fires callbacks back to CRM receipt API               │
+│                                                           │
+│  queued → sent → delivered → opened → clicked → converted │
+│                           ↘ failed (with retry)           │
+│                                                           │
+│  Per-channel delivery profiles (industry benchmarks):     │
+│  WhatsApp 94% · SMS 89% · Email 96% · RCS 78%            │
+│  Retry: 3 attempts with exponential backoff               │
+└──────────────────────────────────────────────────────────┘
 ```
 
-### Key Architecture Decisions
+### Why Two Services
 
-| Decision | Choice | Reasoning |
-|----------|--------|-----------|
-| Database | SQLite (WAL mode) | Fast for single-writer workloads; WAL enables concurrent reads. At scale → Postgres + connection pooling |
-| Channel service | Separate process | Models real-world architecture: CRM and channel providers are independent services. Enables independent scaling and failure isolation |
-| AI batching | Max 20 customers per Claude call | Cost and latency control. At scale → async queue + per-customer fine-tuned templates |
-| Callback retry | 3x exponential backoff | Mirrors how real webhook consumers handle transient failures. At scale → dead letter queue (SQS/Redis) |
-| SQL injection guard | Regex blocklist + parameterization | AI-generated SQL is inherently risky. Blocklist catches obvious injections; prod would use a query-builder layer |
+Real messaging infrastructure works exactly this way — your CRM and your channel provider (Twilio, Gupshup, etc.) are independent services that communicate via webhooks. The channel service here simulates that contract faithfully: it accepts a send request, acknowledges immediately, and fires delivery events back asynchronously. This is not a shortcut. It is the architecture.
 
----
+### Key Decisions and Tradeoffs
 
-## AI-Native Workflow (How I Actually Built This)
-
-This isn't just a product with AI features — my development workflow was AI-native:
-
-1. **Claude for architecture design:** I used Claude to stress-test the two-service callback loop design before writing a line of code — specifically asking it to poke holes in my failure-handling approach.
-
-2. **Claude for data modeling:** The seed data (50 realistic Indian fashion shoppers with purchase histories, tier distributions, and behavioral profiles) was generated with Claude, then reviewed and refined by me.
-
-3. **Copilot/Claude for boilerplate:** Repetitive TypeScript (Express route shapes, type definitions, SQL queries) was AI-assisted, with me reviewing every line for correctness and reviewing the generated SQL for injection risks.
-
-4. **Me for all product decisions:** Every product choice — the Tommy Hilfiger brand narrative, the "Wow factors" to build, what to cut, what to hardcode — was mine. AI accelerated execution; I owned direction.
+| Decision | Choice | Why | Production alternative |
+|----------|--------|-----|------------------------|
+| Database | sql.js (SQLite WASM) | Zero native dependencies, deploys anywhere | Postgres + connection pool |
+| AI | Gemini 1.5 Flash | Free tier, 1500 req/day, no credit card | Fine-tuned model on brand data |
+| Campaign dispatch | setImmediate + axios per recipient | Simple, works for demo scale | BullMQ + Redis job queue |
+| Callback retry | 3x exponential backoff | Mirrors real webhook reliability patterns | Dead letter queue (SQS) |
+| Auth | None | Out of scope for this assignment | JWT + role-based access |
+| SQL injection guard | Regex blocklist + parameterization | AI-generated SQL is inherently risky | Query builder layer (Knex) |
 
 ---
 
-## Product KPIs I Would Track in Production
+## AI-Native Development Workflow
 
-| KPI | Measurement | Target |
-|-----|-------------|--------|
-| **Time-to-First-Campaign** | Minutes from signup to first campaign sent | < 5 min (friction proxy) |
-| **Segment Acceptance Rate** | % of AI-built segments saved vs discarded | > 70% (AI quality proxy) |
-| **Campaign Delivery Rate** | Messages delivered / messages sent | > 90% per channel |
-| **Revenue Attribution** | GMV from converted communications | Primary business metric |
-| **AI API Error Rate** | Failed Claude calls / total calls | < 2% |
+This is not just a product with AI features — the development process itself was AI-native:
 
----
+**Architecture design** — used AI to stress-test the two-service callback loop before writing code. Specifically asked it to find failure modes in the retry logic and delivery state machine.
 
-## Design Philosophy
+**Seed data** — the 50 Tommy Hilfiger India customer profiles (realistic names, cities, spend levels, purchase histories) were generated with AI and reviewed for accuracy.
 
-I made three explicit trade-offs based on what I identified as the core evaluation:
+**Boilerplate acceleration** — TypeScript interfaces, SQL queries, Express route shapes were AI-assisted. Every line reviewed by me for correctness and security.
 
-**1. Depth over breadth.** Rather than building 8 shallow features, I went deep on two: the AI segment builder with reasoning card, and the live callback waterfall. Both directly map to Xeno's actual product differentiation.
-
-**2. The channel service as a first-class citizen.** I could have mocked delivery with a simple `setTimeout`. Instead I built a separate Express service with per-channel delivery profiles, exponential backoff retries, and a proper state machine for communication lifecycle. This shows I understand how real messaging infrastructure works.
-
-**3. Tommy Hilfiger as narrative, not decoration.** Using a brand Xeno actually works with (Aditya Birla Group, which owns TH India) makes every product decision feel grounded. The seed data uses real Indian cities, realistic INR spend levels, and relevant fashion categories — not placeholder "User 1, User 2" data.
-
----
-
-## What I'd Do With 1 More Week
-
-**Technical debt I knowingly took on:**
-
-- **Auth:** No authentication. Production needs JWT + role-based access (Brand Admin, Campaign Manager, Analyst).
-- **Queue:** Campaign sends fire via `setImmediate` with `axios.post` per recipient. At 10,000+ recipients this would saturate the event loop. Production: BullMQ + Redis for job queuing, rate limiting, and retry visibility.
-- **Database:** SQLite hits its limits with concurrent writes. Production: Postgres on Railway with connection pooling via `pg-pool`.
-- **AI cost control:** Currently no caching of segment AI results. Same NL query hit twice → two API calls. Production: semantic cache with Redis + embedding similarity check.
-- **Testing:** Zero unit tests. Would add Vitest for service layer, Supertest for API routes, Playwright for E2E.
-- **Observability:** Would add structured logging (Pino), error tracking (Sentry), and a `/metrics` endpoint for Prometheus.
-
-**Feature roadmap:**
-
-- Multi-channel campaign sequencing (WhatsApp day 1 → Email day 3 if not opened)
-- Cohort analytics — how does segment behavior change over time post-campaign?
-- AI campaign scheduling — "when's the best time to reach this audience?"
-- A/B message testing with statistical significance detection
+**Product decisions were mine** — the Tommy Hilfiger brand framing, the "wow" features to build, what to cut, the orange/white design system, the reasoning card UX — all human decisions. AI executed, I directed.
 
 ---
 
 ## Data Model
 
 ```sql
-customers    → id, name, email, phone, city, tier, total_spent, order_count, 
-               last_purchase_date, preferred_category, age_group
+customers       id, name, email, phone, city,
+                tier (Bronze/Silver/Gold/Platinum),
+                total_spent, order_count,
+                last_purchase_date, preferred_category, age_group
 
-orders       → id, customer_id, amount, items(JSON), category, channel, order_date
+orders          id, customer_id, amount, items (JSON),
+                category, channel, order_date
 
-segments     → id, name, filter_query(SQL), natural_language_query, 
-               customer_count, ai_reasoning(JSON)
+segments        id, name, filter_query (AI-generated SQL),
+                natural_language_query, customer_count,
+                ai_reasoning (JSON)
 
-campaigns    → id, name, segment_id, channel, message_template, status,
-               sent_count, delivered_count, opened_count, clicked_count,
-               converted_count, failed_count
+campaigns       id, name, segment_id, channel, message_template,
+                status, sent_count, delivered_count,
+                opened_count, clicked_count, converted_count, failed_count
 
-communications → id, campaign_id, customer_id, channel, personalized_message,
-                 status, sent_at, delivered_at, opened_at, clicked_at, 
-                 converted_at, failed_reason
+communications  id, campaign_id, customer_id,
+                personalized_message, status,
+                sent_at, delivered_at, opened_at,
+                clicked_at, converted_at, failed_reason
 ```
+
+---
+
+## Product KPIs (If This Went Live)
+
+| KPI | What It Measures | Target |
+|-----|-----------------|--------|
+| Time-to-First-Campaign | Minutes from signup to first send | < 5 min |
+| Segment Acceptance Rate | AI segments saved vs discarded | > 70% |
+| Delivery Rate | Messages delivered / sent | > 90% |
+| Revenue Attribution | GMV from converted communications | Primary business metric |
+| AI Error Rate | Failed Gemini calls / total calls | < 2% |
+
+---
+
+## Design Philosophy
+
+Three explicit tradeoffs I made based on what I read as the core evaluation:
+
+**Depth over breadth.** The brief said "figuring out what NOT to build is part of what we're evaluating." I built two things deeply — the AI segment builder with reasoning card, and the live callback waterfall — rather than eight things shallowly.
+
+**The channel service as a first-class citizen.** The brief said "how you model it tells us a lot." I built a separate Express service with per-channel delivery profiles, realistic timing distributions, exponential backoff retries, and a proper state machine. Most candidates will use a setTimeout.
+
+**Tommy Hilfiger as narrative, not decoration.** Xeno works with Aditya Birla Group, which owns Tommy Hilfiger India. Using a real brand in Xeno's actual customer portfolio makes every product decision feel grounded — not a toy demo.
+
+---
+
+## What I Would Do With One More Week
+
+**Technical debt I consciously took on:**
+
+- **Queue** — campaign sends fire via `setImmediate`. At 10,000+ recipients this needs BullMQ + Redis with rate limiting and retry visibility
+- **Database** — sql.js is ephemeral on free hosting. Production needs Postgres with WAL and connection pooling
+- **Auth** — single marketer context, no login. Production needs JWT + role-based access (Admin, Campaign Manager, Analyst)
+- **AI caching** — same NL query hit twice makes two API calls. Needs semantic cache with Redis + embedding similarity
+- **Testing** — zero unit tests. Would add Vitest for services, Supertest for API routes, Playwright for E2E
+- **Observability** — would add Pino for structured logging, Sentry for error tracking, `/metrics` for Prometheus
+
+**Feature roadmap:**
+
+- Multi-channel sequencing — WhatsApp day 1 → Email day 3 if unopened
+- Cohort analytics — how does segment behaviour change post-campaign over time
+- AI scheduling — "what's the best time to reach this audience this week"
+- A/B message testing with statistical significance detection
+- Loyalty tier upgrade campaigns — auto-trigger when a Bronze customer hits Silver threshold
 
 ---
 
@@ -202,12 +219,16 @@ communications → id, campaign_id, customer_id, channel, personalized_message,
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18 + TypeScript + Vite + TailwindCSS + React Query |
-| CRM Backend | Node.js + TypeScript + Express + better-sqlite3 |
-| Channel Service | Node.js + TypeScript + Express |
-| AI | Anthropic Claude (claude-sonnet-4-6) via `@anthropic-ai/sdk` |
-| Deployment | Railway (both backend services) + Vercel (frontend) |
+| Frontend | React 18 · TypeScript · Vite · Tailwind CSS · React Query |
+| CRM Backend | Node.js · TypeScript · Express · sql.js |
+| Channel Service | Node.js · TypeScript · Express |
+| AI | Google Gemini 1.5 Flash |
+| Deployment | Render (backend) · Vercel (frontend) |
 
 ---
 
-*Built with 🤝 AI-assistance and 🧠 product thinking by Bhavika Jadon for the  Xeno SDE Challenge, June 2026*
+<div align="center">
+
+Built by **Bhavika Jadon** for the Xeno FDE Engineering Challenge · June 2026
+
+</div>

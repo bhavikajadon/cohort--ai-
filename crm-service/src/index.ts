@@ -1,66 +1,85 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { getDb, initializeDatabase } from './db/database';
-
-// 1. Statically import your routes the modern way
-import customersRouter from './routes/customers';
-import segmentsRouter from './routes/segments';
-import campaignsRouter from './routes/campaigns';
-import receiptsRouter from './routes/receipts';
+import { getDb, initializeDatabase, all } from './db/database';
 
 dotenv.config();
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT || '3000');
+const SEED_SECRET = process.env.SEED_SECRET || 'cohortai-seed-2026';
 
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
 app.use(express.json());
-app.use((req, _res, next) => { 
-  console.log(`${new Date().toISOString()} ${req.method} ${req.path}`); 
-  next(); 
+app.use((req, _res, next) => {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
+  next();
 });
 
-app.get('/health', (_req, res) => res.json({ 
-  status: 'ok', 
-  service: 'cohortai-crm', 
-  brand: 'Tommy Hilfiger India', 
-  ts: new Date().toISOString() 
-}));
-
-// 2. Mount routes immediately. The handlers inside them 
-// won't execute until requests actually hit the server.
-app.use('/api/customers', customersRouter);
-app.use('/api/segments', segmentsRouter);
-app.use('/api/campaigns', campaignsRouter);
-app.use('/api/receipts', receiptsRouter);
-
-// 3. Add a global error handler to prevent the API from crashing silently
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled API Error:', err);
-  res.status(500).json({ error: 'Internal Server Error', details: err.message });
+// Health check
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'cohort-ai-crm',
+    brand: 'Tommy Hilfiger India',
+    ts: new Date().toISOString()
+  });
 });
 
-// 4. Use a clean top-level async initialization block
-const startServer = async () => {
+// One-time seed endpoint — hit this in browser after first deploy
+// Protected by a secret so random people can't re-seed your data
+app.get('/seed/:secret', async (req, res) => {
+  if (req.params.secret !== SEED_SECRET) {
+    return res.status(403).json({ error: 'Invalid secret' });
+  }
   try {
-    // Wait for the WebAssembly SQLite engine to spin up
-    await getDb();
-    
-    // Create tables if they don't exist
-    initializeDatabase();
-
-    // Only start accepting traffic once the database is guaranteed ready
-    app.listen(PORT, () => {
-      console.log(`🚀 Cohort AI CRM running on port ${PORT}`);
-      if (!process.env.ANTHROPIC_API_KEY) {
-        console.warn('⚠️  WARNING: ANTHROPIC_API_KEY is not set in the environment variables.');
-      }
+    // Dynamically import and run seed
+    const { default: runSeed } = await import('./db/seed-fn');
+    await runSeed();
+    const count = all<{ count: number }>('SELECT COUNT(*) as count FROM customers');
+    return res.json({
+      success: true,
+      customers: count[0]?.count ?? 0,
+      message: 'Tommy Hilfiger India database seeded successfully'
     });
   } catch (err) {
-    console.error('❌ Failed to initialize database or start server:', err);
-    process.exit(1);
+    console.error('Seed error:', err);
+    return res.status(500).json({ error: String(err) });
   }
-};
+});
 
-startServer(); 
+// Init DB then load routes
+getDb().then(async () => {
+  initializeDatabase();
+
+  // Auto-seed if empty
+  try {
+    const count = all<{ count: number }>('SELECT COUNT(*) as count FROM customers');
+    if ((count[0]?.count ?? 0) === 0) {
+      console.log('📦 Empty DB — auto-seeding...');
+      const { default: runSeed } = await import('./db/seed-fn');
+      await runSeed();
+    }
+  } catch (err) {
+    console.warn('Auto-seed skipped:', err);
+  }
+
+  const customers  = require('./routes/customers').default;
+  const segments   = require('./routes/segments').default;
+  const campaigns  = require('./routes/campaigns').default;
+  const receipts   = require('./routes/receipts').default;
+
+  app.use('/api/customers', customers);
+  app.use('/api/segments',  segments);
+  app.use('/api/campaigns', campaigns);
+  app.use('/api/receipts',  receipts);
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Cohort AI CRM running on :${PORT}`);
+    console.log(`🌱 Seed URL: /seed/${SEED_SECRET}`);
+    if (!process.env.GEMINI_API_KEY) console.warn('⚠️  GEMINI_API_KEY not set');
+  });
+}).catch(err => {
+  console.error('Failed to initialize DB:', err);
+  process.exit(1);
+});

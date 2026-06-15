@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { all, get } from '../db/database';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
 export interface SegmentAIResult {
   filterQuery: string;
@@ -53,7 +53,6 @@ SQL RULES: Only a WHERE clause. Use date('now','-N days') for relative dates. No
     return JSON.parse(clean);
   } catch (err) {
     console.error('Gemini segment build error:', err);
-    // Sensible fallback so the app never crashes
     return {
       filterQuery: "total_spent > 10000",
       segmentName: "High Value Shoppers",
@@ -120,7 +119,6 @@ Return ONLY a JSON array, no markdown, no backticks:
     const clean = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     return JSON.parse(clean);
   } catch {
-    // Fallback: template messages
     return customers.map(c => ({
       customerId: c.id,
       message: `Hey ${c.name.split(' ')[0]}! Your exclusive Tommy Hilfiger ${c.preferred_category} drop is here. Shop now 🏆`
